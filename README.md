@@ -19,22 +19,24 @@ var (
 )
 
 func cry_for_help(ctx context.Context) {
-    thisfile_log.Debugf(ctx, "How big is my problem: %s", "pretty big")
+    thisfile_log.Errorf(ctx, "How big is my problem: %s", "pretty big")
 }
 ```
 
 Notice that we pass in the name of a prefix (what we refer to as a "noun") to `log.NewLogger()`. This is a simple, descriptive name that represents the current body of logic. We recommend that you define a different log for every file at the package level, but it is your choice if you want to go with this methodology, share the same logger over the entire package, define one for each struct, etc..
 
-### Example output
+### Example Output
 
 Example output from a real application (not from the above):
 
+```
 2016/09/09 12:57:44 DEBUG: user: User revisiting: [test@example.com]
 2016/09/09 12:57:44 DEBUG: context: Session already inited: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
 2016/09/09 12:57:44 DEBUG: session_data: Session save not necessary: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
 2016/09/09 12:57:44 DEBUG: context: Got session: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
 2016/09/09 12:57:44 DEBUG: session_data: Found user in session.
 2016/09/09 12:57:44 DEBUG: cache: Cache miss: [geo.geocode.reverse:dhxp15x]
+```
 
 
 ## Adapters
@@ -148,7 +150,7 @@ We'll first hit the include-filters. If it's in there, we'll forward the log ite
 
 #### Footnote
 
-It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable, such as "<LibraryName>DoShowLogging", that has been defined and set to TRUE.
+It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable, such as "(LibraryNameHere)DoShowLogging", that has been defined and set to TRUE.
 
 
 ### Configuration
