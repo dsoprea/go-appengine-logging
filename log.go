@@ -249,7 +249,7 @@ func (l *Logger) makeLogContext(ctx context.Context) *LogContext {
 
 type LogMethod func(lc *LogContext, message *string) error
 
-func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string, args ...interface{}) error {
+func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string, args []interface{}) error {
     if l.systemLevel > level {
         return nil
     }

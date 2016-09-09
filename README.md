@@ -25,6 +25,17 @@ func cry_for_help(ctx context.Context) {
 
 Notice that we pass in the name of a prefix (what we refer to as a "noun") to `log.NewLogger()`. This is a simple, descriptive name that represents the current body of logic. We recommend that you define a different log for every file at the package level, but it is your choice if you want to go with this methodology, share the same logger over the entire package, define one for each struct, etc..
 
+### Example output
+
+Example output from a real application (not from the above):
+
+2016/09/09 12:57:44 DEBUG: user: User revisiting: [test@example.com]
+2016/09/09 12:57:44 DEBUG: context: Session already inited: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
+2016/09/09 12:57:44 DEBUG: session_data: Session save not necessary: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
+2016/09/09 12:57:44 DEBUG: context: Got session: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
+2016/09/09 12:57:44 DEBUG: session_data: Found user in session.
+2016/09/09 12:57:44 DEBUG: cache: Cache miss: [geo.geocode.reverse:dhxp15x]
+
 
 ## Adapters
 
