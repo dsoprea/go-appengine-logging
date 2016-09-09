@@ -7,6 +7,7 @@ import (
     "errors"
     "fmt"
     "bytes"
+    "strings"
 
     "golang.org/x/net/context"
 )
@@ -16,6 +17,8 @@ const (
     CkLogDefaultFormat = "LogDefaultFormat"
     CkLogDefaultAdapter = "LogDefaultAdapter"
     CkLogDefaultLevel = "LogDefaultLevel"
+    CkLogDefaultIncludeNouns = "LogDefaultIncludeNouns"
+    CkLogDefaultExcludeNouns = "LogDefaultExcludeNouns"
 )
 
 // Config severity integers.
@@ -36,6 +39,11 @@ const (
     LevelNameCritical = "critical"
 )
 
+// Other constants
+const (
+    AdapterMakerAppEngine = "appengine"
+)
+
 // Seveirty name->integer map.
 var (
     LevelNameMap = map[string]int {
@@ -52,6 +60,8 @@ var (
     LogDefaultFormat = os.Getenv(CkLogDefaultFormat)
     LogDefaultAdapter = os.Getenv(CkLogDefaultAdapter)
     LogDefaultLevel = os.Getenv(CkLogDefaultLevel)
+    LogDefaultIncludeNouns = os.Getenv(CkLogDefaultIncludeNouns)
+    LogDefaultExcludeNouns = os.Getenv(CkLogDefaultExcludeNouns)
 )
 
 // Errors
@@ -62,11 +72,11 @@ var (
 
 var (
     includeFilters = make(map[string]bool)
-    useIncludeFilters = true
+    useIncludeFilters = false
     excludeFilters = make(map[string]bool)
-    useExcludeFilters = true
+    useExcludeFilters = false
 
-    makers = make(map[string]*AdapterMaker)
+    makers = make(map[string]AdapterMaker)
 )
 
 // Add global include filter.
@@ -82,10 +92,18 @@ func AddExcludeFilter(noun string) {
 }
 
 type AdapterMaker interface {
-    New() *LogAdapter
+    New() LogAdapter
 }
 
-func AddAdapterMaker(name string, am *AdapterMaker) {
+type AppEngineAdapterMaker struct {
+
+}
+
+func (aeam AppEngineAdapterMaker) New() LogAdapter {
+    return AppEngineLogAdapter{}
+}
+
+func AddAdapterMaker(name string, am AdapterMaker) {
     if _, found := makers[name]; found == true {
         panic(ErrAdapterMakerAlreadyDefined)
     }
@@ -156,7 +174,7 @@ func NewLogger(noun string) *Logger {
 
     if LogDefaultAdapter != "" {
         am := makers[LogDefaultAdapter]
-        la = *(*am).New()
+        la = am.New()
     } else {
         la = AppEngineLogAdapter{}
     }
@@ -213,7 +231,13 @@ func (l *Logger) makeLogContext(ctx context.Context) *LogContext {
     }
 }
 
-func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface{}) error {
+type LogMethod func(lc *LogContext, message *string) error
+
+func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string, args ...interface{}) error {
+    if l.systemLevel > level {
+        return nil
+    }
+
     if(l.allowMessage(l.Noun) == false) {
         return nil
     }
@@ -222,74 +246,54 @@ func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface
         return err
     } else {
         lc := l.makeLogContext(ctx)
-        return (*l.la).Criticalf(lc, &s)
+        return lm(lc, &s)
     }
 }
 
 func (l *Logger) Debugf(ctx context.Context, format string, args ...interface{}) error {
-    if l.systemLevel > LevelDebug {
-        return nil
-    }
-
-    if(l.allowMessage(l.Noun) == false) {
-        return nil
-    }
-
-    if s, err := l.flattenMessage(&format, args); err != nil {
-        return err
-    } else {
-        lc := l.makeLogContext(ctx)
-        return (*l.la).Debugf(lc, &s)
-    }
-}
-
-func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) error {
-    if l.systemLevel > LevelError {
-        return nil
-    }
-
-    if(l.allowMessage(l.Noun) == false) {
-        return nil
-    }
-
-    if s, err := l.flattenMessage(&format, args); err != nil {
-        return err
-    } else {
-        lc := l.makeLogContext(ctx)
-        return (*l.la).Errorf(lc, &s)
-    }
+    return l.log(ctx, LevelDebug, (*l.la).Debugf, format, args)
 }
 
 func (l *Logger) Infof(ctx context.Context, format string, args ...interface{}) error {
-    if l.systemLevel > LevelInfo {
-        return nil
-    }
-
-    if(l.allowMessage(l.Noun) == false) {
-        return nil
-    }
-
-    if s, err := l.flattenMessage(&format, args); err != nil {
-        return err
-    } else {
-        lc := l.makeLogContext(ctx)
-        return (*l.la).Infof(lc, &s)
-    }
+    return l.log(ctx, LevelInfo, (*l.la).Infof, format, args)
 }
 
 func (l *Logger) Warningf(ctx context.Context, format string, args ...interface{}) error {
-    if l.systemLevel > LevelWarning {
-        return nil
+    return l.log(ctx, LevelWarning, (*l.la).Warningf, format, args)
+}
+
+func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) error {
+    return l.log(ctx, LevelError, (*l.la).Errorf, format, args)
+}
+
+func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface{}) error {
+    return l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+}
+
+func init() {
+    if LogDefaultFormat == "" {
+        LogDefaultFormat = "{{.Noun}}: {{.Message}}"
     }
 
-    if(l.allowMessage(l.Noun) == false) {
-        return nil
+    if LogDefaultAdapter == "" {
+        LogDefaultAdapter = AdapterMakerAppEngine
     }
 
-    if s, err := l.flattenMessage(&format, args); err != nil {
-        return err
-    } else {
-        lc := l.makeLogContext(ctx)
-        return (*l.la).Warningf(lc, &s)
+    if LogDefaultLevel == "" {
+        LogDefaultLevel = LevelNameInfo
+    }
+
+    AddAdapterMaker(AdapterMakerAppEngine, AppEngineAdapterMaker{})
+
+    if LogDefaultIncludeNouns != "" {
+        for _, noun := range strings.Split(LogDefaultIncludeNouns, ",") {
+            AddIncludeFilter(noun)
+        }
+    }
+
+    if LogDefaultExcludeNouns != "" {
+        for _, noun := range strings.Split(LogDefaultExcludeNouns, ",") {
+            AddExcludeFilter(noun)
+        }
     }
 }
