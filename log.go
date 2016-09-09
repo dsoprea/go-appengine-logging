@@ -85,10 +85,26 @@ func AddIncludeFilter(noun string) {
     useIncludeFilters = true
 }
 
+// Remove global include filter.
+func RemoveIncludeFilter(noun string) {
+    delete(includeFilters, noun)
+    if len(includeFilters) == 0 {
+        useIncludeFilters = false
+    }
+}
+
 // Add global exclude filter.
 func AddExcludeFilter(noun string) {
     excludeFilters[noun] = true
     useExcludeFilters = true
+}
+
+// Remove global exclude filter.
+func RemoveExcludeFilter(noun string) {
+    delete(excludeFilters, noun)
+    if len(excludeFilters) == 0 {
+        useExcludeFilters = false
+    }
 }
 
 type AdapterMaker interface {
