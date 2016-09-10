@@ -14,11 +14,12 @@ import (
 
 // Config keys.
 const (
-    CkLogDefaultFormat = "LogDefaultFormat"
-    CkLogDefaultAdapter = "LogDefaultAdapter"
-    CkLogDefaultLevel = "LogDefaultLevel"
-    CkLogDefaultIncludeNouns = "LogDefaultIncludeNouns"
-    CkLogDefaultExcludeNouns = "LogDefaultExcludeNouns"
+    ckFormat = "LogFormat"
+    ckAdapterName = "LogAdapterName"
+    ckLevelName = "LogLevelName"
+    ckIncludeNouns = "LogIncludeNouns"
+    ckExcludeNouns = "LogExcludeNouns"
+    ckExcludeBypassLevelName = "LogExcludeBypassLevelName"
 )
 
 // Config severity integers.
@@ -39,9 +40,16 @@ const (
     LevelNameCritical = "critical"
 )
 
+// Built-in adapter makers
+const (
+    adapterMakerAppEngine = "appengine"
+)
+
 // Other constants
 const (
-    AdapterMakerAppEngine = "appengine"
+    defaultAdapter = adapterMakerAppEngine
+    defaultFormat = "{{.Noun}}: {{.Message}}"
+    defaultLevelName = LevelNameInfo
 )
 
 // Seveirty name->integer map.
@@ -57,19 +65,38 @@ var (
 
 // Config
 var (
-    LogDefaultFormat = os.Getenv(CkLogDefaultFormat)
-    LogDefaultAdapter = os.Getenv(CkLogDefaultAdapter)
-    LogDefaultLevel = os.Getenv(CkLogDefaultLevel)
-    LogDefaultIncludeNouns = os.Getenv(CkLogDefaultIncludeNouns)
-    LogDefaultExcludeNouns = os.Getenv(CkLogDefaultExcludeNouns)
+    // Alternative format (defaults to .
+    format = os.Getenv(ckFormat)
+
+    // Alternative adapter (defaults to "appengine").
+    adapterName = os.Getenv(ckAdapterName)
+
+    // Alternative level at which to display log-items (defaults to 
+    // "info").
+    levelName = os.Getenv(ckLevelName)
+
+    // Configuration-driven comma-separated list of nouns to include. Defaults
+    // to empty.
+    includeNouns = os.Getenv(ckIncludeNouns)
+
+    // Configuration-driven comma-separated list of nouns to exclude. Defaults 
+    // to empty.
+    excludeNouns = os.Getenv(ckExcludeNouns)
+
+    // Level at which to disregard exclusion (if the severity of a message 
+    // meets or exceed this, always display). Defaults to empty.
+    excludeBypassLevelName = os.Getenv(ckExcludeBypassLevelName)
 )
 
 // Errors
 var (
-    ErrAdapterMakerAlreadyDefined = errors.New("Adapter-maker already defined.")
-    ErrLogLevelInvalid = errors.New("Log-level not valid.")
+    ErrAdapterMakerAlreadyDefined = errors.New("adapter-maker already defined")
+    ErrLogLevelInvalid = errors.New("log-level not valid")
+    ErrFormatEmpty = errors.New("format is empty")
+    ErrExcludeLevelNameInvalid = errors.New("exclude bypass-level is invalid")
 )
 
+// Other
 var (
     includeFilters = make(map[string]bool)
     useIncludeFilters = false
@@ -77,6 +104,9 @@ var (
     useExcludeFilters = false
 
     makers = make(map[string]AdapterMaker)
+
+// TODO(dustin): !! Finish implementing this.
+    excludeBypassLevel = -1
 )
 
 // Add global include filter.
@@ -135,6 +165,9 @@ type LogAdapter interface {
     Warningf(lc *LogContext, message *string) error
 }
 
+// TODO(dustin): !! Also populate whether we've bypassed an exception so that 
+//                  we can add a template macro to prefix an exclamation of 
+//                  some sort.
 type MessageContext struct {
     Noun *string
     Message *string
@@ -161,13 +194,9 @@ func NewLoggerWithAdapter(noun string, la *LogAdapter) *Logger {
 
     // Set the level.
 
-    systemLevelName := LogDefaultLevel
     var systemLevel int
     var found bool
-
-    if systemLevelName == "" {
-        systemLevel = LevelInfo
-    } else if systemLevel, found = LevelNameMap[systemLevelName]; found == false {
+    if systemLevel, found = LevelNameMap[levelName]; found == false {
         panic(ErrLogLevelInvalid)
     }
 
@@ -175,9 +204,9 @@ func NewLoggerWithAdapter(noun string, la *LogAdapter) *Logger {
 
     // Set the form.
 
-    format := LogDefaultFormat
+    format := format
     if format == "" {
-        format = "{{.Noun}}: {{.Message}}"
+        panic(ErrFormatEmpty)
     }
 
     l.SetFormat(format)
@@ -188,12 +217,8 @@ func NewLoggerWithAdapter(noun string, la *LogAdapter) *Logger {
 func NewLogger(noun string) *Logger {
     var la LogAdapter
 
-    if LogDefaultAdapter != "" {
-        am := makers[LogDefaultAdapter]
-        la = am.New()
-    } else {
-        la = AppEngineLogAdapter{}
-    }
+    am := makers[adapterName]
+    la = am.New()
 
     return NewLoggerWithAdapter(noun, &la)
 }
@@ -222,7 +247,13 @@ func (l *Logger) flattenMessage(format *string, args []interface{}) (string, err
     return b.String(), nil
 }
 
-func (l *Logger) allowMessage(noun *string) bool {
+func (l *Logger) allowMessage(noun *string, level int) bool {
+    // Preempt the normal filter checks if we can unconditionally allow at a 
+    // certain level and we've hit that level.
+    if level >= excludeBypassLevel && excludeBypassLevel != -1 {
+        return true
+    }
+
     if _, found := includeFilters[*noun]; found == true {
         return true
     }
@@ -254,7 +285,7 @@ func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string
         return nil
     }
 
-    if(l.allowMessage(l.Noun) == false) {
+    if(l.allowMessage(l.Noun, level) == false) {
         return nil
     }
 
@@ -287,29 +318,36 @@ func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface
 }
 
 func init() {
-    if LogDefaultFormat == "" {
-        LogDefaultFormat = "{{.Noun}}: {{.Message}}"
+    if format == "" {
+        format = defaultFormat
     }
 
-    if LogDefaultAdapter == "" {
-        LogDefaultAdapter = AdapterMakerAppEngine
+    if adapterName == "" {
+        adapterName = defaultAdapter
     }
 
-    if LogDefaultLevel == "" {
-        LogDefaultLevel = LevelNameInfo
+    if levelName == "" {
+        levelName = defaultLevelName
     }
 
-    AddAdapterMaker(AdapterMakerAppEngine, AppEngineAdapterMaker{})
+    AddAdapterMaker(adapterMakerAppEngine, AppEngineAdapterMaker{})
 
-    if LogDefaultIncludeNouns != "" {
-        for _, noun := range strings.Split(LogDefaultIncludeNouns, ",") {
+    if includeNouns != "" {
+        for _, noun := range strings.Split(includeNouns, ",") {
             AddIncludeFilter(noun)
         }
     }
 
-    if LogDefaultExcludeNouns != "" {
-        for _, noun := range strings.Split(LogDefaultExcludeNouns, ",") {
+    if excludeNouns != "" {
+        for _, noun := range strings.Split(excludeNouns, ",") {
             AddExcludeFilter(noun)
+        }
+    }
+
+    if excludeBypassLevelName != "" {
+        var found bool
+        if excludeBypassLevel, found = LevelNameMap[excludeBypassLevelName]; found == false {
+            panic(ErrExcludeLevelNameInvalid)
         }
     }
 }
