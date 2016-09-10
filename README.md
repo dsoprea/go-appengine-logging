@@ -18,7 +18,7 @@ var (
     thisfile_log = log.NewLogger("thisfile")
 )
 
-func cry_for_help(ctx context.Context) {
+func a_cry_for_help(ctx context.Context) {
     thisfile_log.Errorf(ctx, "How big is my problem: %s", "pretty big")
 }
 ```
@@ -157,8 +157,9 @@ It is a good convention to exclude the nouns of any library you are writing whos
 
 The following configuration keys can be used to pre-configure your logging directly from your configuration (the AppEngine YAML files):
 
-- *LogDefaultFormat*: The default format used to build the message that gets sent to the adapter. Since it is assumed that the adapter already prefixes the message with time and log-level (since the default AppEngine logger does), this can really only describe how and where to combine the noun with the message. By default, it is "{{.Noun}}: {{.Message}}" (these two tokens are the only ones available to use).
-- *LogDefaultAdapter*: The name of the adapter to use when NewLogger() is called.
-- *LogDefaultLevel*: The priority-level of messages permitted to be logged (all others will be discarded). By default, it is "info". Other levels are: "debug", "warning", "error", "critical"
-- *LogDefaultIncludeNouns*: Comma-separated list of nouns to log for. All others will be ignored.
-- *LogDefaultExcludeNouns*: Comma-separated list on nouns to exclude from logging.
+- *LogFormat*: The default format used to build the message that gets sent to the adapter. It is assumed that the adapter already prefixes the message with time and log-level (since the default AppEngine logger does). The default value is: `{{.Noun}}:{{if eq .ExcludeBypass true}} [BYPASS]{{end}} {{.Message}}`. The available tokens are "Noun", "ExcludeBypass", and "Message".
+- *LogAdapterName*: The name of the adapter to use when NewLogger() is called.
+- *LogLevelName*: The priority-level of messages permitted to be logged (all others will be discarded). By default, it is "info". Other levels are: "debug", "warning", "error", "critical"
+- *LogIncludeNouns*: Comma-separated list of nouns to log for. All others will be ignored.
+- *LogExcludeNouns*: Comma-separated list on nouns to exclude from logging.
+- *LogExcludeBypassLevelName*: The log-level at which we will show logging for nouns that have been excluded. Allows you to hide excessive, unimportant logging for nouns but to still see their warnings, errors, etc...
