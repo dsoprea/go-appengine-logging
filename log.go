@@ -48,7 +48,7 @@ const (
 // Other constants
 const (
     defaultAdapter = adapterMakerAppEngine
-    defaultFormat = "{{.Noun}}: {{.Message}}"
+    defaultFormat = "{{.Noun}}:{{if eq .ExcludeBypass true}} [BYPASS]{{end}} {{.Message}}"
     defaultLevelName = LevelNameInfo
 )
 
@@ -171,6 +171,7 @@ type LogAdapter interface {
 type MessageContext struct {
     Noun *string
     Message *string
+    ExcludeBypass bool
 }
 
 type LogContext struct {
@@ -231,14 +232,11 @@ func (l *Logger) SetFormat(format string) {
     }
 }
 
-func (l *Logger) flattenMessage(format *string, args []interface{}) (string, error) {
+func (l *Logger) flattenMessage(lc *MessageContext, format *string, args []interface{}) (string, error) {
     m := fmt.Sprintf(*format, args...)
-    
-    lc := &MessageContext{
-        Noun: l.Noun,
-        Message: &m,
-    }
 
+    lc.Message = &m
+    
     var b bytes.Buffer
     if err := l.t.Execute(&b, *lc); err != nil {
         return "", err
@@ -248,12 +246,6 @@ func (l *Logger) flattenMessage(format *string, args []interface{}) (string, err
 }
 
 func (l *Logger) allowMessage(noun *string, level int) bool {
-    // Preempt the normal filter checks if we can unconditionally allow at a 
-    // certain level and we've hit that level.
-    if level >= excludeBypassLevel && excludeBypassLevel != -1 {
-        return true
-    }
-
     if _, found := includeFilters[*noun]; found == true {
         return true
     }
@@ -285,11 +277,27 @@ func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string
         return nil
     }
 
+    // Preempt the normal filter checks if we can unconditionally allow at a 
+    // certain level and we've hit that level.
+    //
+    // Notice that this is only relevant if the system-log level is letting 
+    // *anything* show logs at the level we came in with.
+    canExcludeBypass := level >= excludeBypassLevel && excludeBypassLevel != -1
+    didExcludeBypass := false
     if(l.allowMessage(l.Noun, level) == false) {
-        return nil
+        if canExcludeBypass == false {
+            return nil
+        } else {
+            didExcludeBypass = true
+        }
     }
 
-    if s, err := l.flattenMessage(&format, args); err != nil {
+    lc := &MessageContext{
+        Noun: l.Noun,
+        ExcludeBypass: didExcludeBypass,
+    }
+
+    if s, err := l.flattenMessage(lc, &format, args); err != nil {
         return err
     } else {
         lc := l.makeLogContext(ctx)
