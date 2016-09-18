@@ -301,28 +301,37 @@ func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string
         return err
     } else {
         lc := l.makeLogContext(ctx)
-        return lm(lc, &s)
+        if err := lm(lc, &s); err != nil {
+            panic(err)
+        }
+
+        return errors.New(s)
     }
 }
 
-func (l *Logger) Debugf(ctx context.Context, format string, args ...interface{}) error {
+func (l *Logger) Debugf(ctx context.Context, format string, args ...interface{}) {
     return l.log(ctx, LevelDebug, (*l.la).Debugf, format, args)
 }
 
-func (l *Logger) Infof(ctx context.Context, format string, args ...interface{}) error {
+func (l *Logger) Infof(ctx context.Context, format string, args ...interface{}) {
     return l.log(ctx, LevelInfo, (*l.la).Infof, format, args)
 }
 
-func (l *Logger) Warningf(ctx context.Context, format string, args ...interface{}) error {
+func (l *Logger) Warningf(ctx context.Context, format string, args ...interface{}) {
     return l.log(ctx, LevelWarning, (*l.la).Warningf, format, args)
 }
 
-func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) error {
+func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) {
     return l.log(ctx, LevelError, (*l.la).Errorf, format, args)
 }
 
-func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface{}) error {
+func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface{}) {
     return l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+}
+
+func (l *Logger) Panicf(ctx context.Context, format string, args ...interface{}) {
+     err := l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+     panic(err)
 }
 
 func init() {
