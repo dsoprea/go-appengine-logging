@@ -4,12 +4,14 @@ import (
     "text/template"
 
     "os"
-    "errors"
+    e "errors"
     "fmt"
     "bytes"
     "strings"
 
     "golang.org/x/net/context"
+
+    "github.com/go-errors/errors"
 )
 
 // Config keys.
@@ -90,10 +92,10 @@ var (
 
 // Errors
 var (
-    ErrAdapterMakerAlreadyDefined = errors.New("adapter-maker already defined")
-    ErrLogLevelInvalid = errors.New("log-level not valid")
-    ErrFormatEmpty = errors.New("format is empty")
-    ErrExcludeLevelNameInvalid = errors.New("exclude bypass-level is invalid")
+    ErrAdapterMakerAlreadyDefined = e.New("adapter-maker already defined")
+    ErrLogLevelInvalid = e.New("log-level not valid")
+    ErrFormatEmpty = e.New("format is empty")
+    ErrExcludeLevelNameInvalid = e.New("exclude bypass-level is invalid")
 )
 
 // Other
@@ -305,33 +307,116 @@ func (l *Logger) log(ctx context.Context, level int, lm LogMethod, format string
             panic(err)
         }
 
-        return errors.New(s)
+        return e.New(s)
     }
 }
 
 func (l *Logger) Debugf(ctx context.Context, format string, args ...interface{}) {
-    return l.log(ctx, LevelDebug, (*l.la).Debugf, format, args)
+    l.log(ctx, LevelDebug, (*l.la).Debugf, format, args)
 }
 
 func (l *Logger) Infof(ctx context.Context, format string, args ...interface{}) {
-    return l.log(ctx, LevelInfo, (*l.la).Infof, format, args)
+    l.log(ctx, LevelInfo, (*l.la).Infof, format, args)
 }
 
 func (l *Logger) Warningf(ctx context.Context, format string, args ...interface{}) {
-    return l.log(ctx, LevelWarning, (*l.la).Warningf, format, args)
+    l.log(ctx, LevelWarning, (*l.la).Warningf, format, args)
 }
 
-func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) {
-    return l.log(ctx, LevelError, (*l.la).Errorf, format, args)
+func (l *Logger) mergeStack(err interface{}, format string, args []interface{}) (string, []interface{}) {
+    if format != "" {
+        format += "\n%s"
+    } else {
+        format = "%s"
+    }
+
+    var stackified *errors.Error
+    stackified, ok := err.(*errors.Error)
+    if ok == false {
+        stackified = errors.Wrap(err, 2)
+    }
+
+    args = append(args, stackified.ErrorStack())
+
+    return format, args
 }
 
-func (l *Logger) Criticalf(ctx context.Context, format string, args ...interface{}) {
-    return l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+func (l *Logger) Errorf(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    format, args = l.mergeStack(err, format, args)
+    l.log(ctx, LevelError, (*l.la).Errorf, format, args)
 }
 
-func (l *Logger) Panicf(ctx context.Context, format string, args ...interface{}) {
-     err := l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
-     panic(err)
+func (l *Logger) ErrorIff(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    if err == nil {
+        return
+    }
+
+    l.Errorf(ctx, err, format, args...)
+}
+
+func (l *Logger) Criticalf(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    format, args = l.mergeStack(err, format, args)
+    l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+}
+
+func (l *Logger) CriticalIff(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    if err == nil {
+        return
+    }
+
+    l.Criticalf(ctx, err, format, args)
+}
+
+func (l *Logger) Panicf(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    
+
+    format, args = l.mergeStack(err, format, args)
+    errFlat := l.log(ctx, LevelCritical, (*l.la).Criticalf, format, args)
+    panic(errFlat)
+}
+
+func (l *Logger) PanicIff(ctx context.Context, err interface{}, format string, args ...interface{}) {
+    if err == nil {
+        return
+    }
+
+    _, ok := err.(*errors.Error)
+    if ok == true {
+        panic(err)
+    } else {
+        panic(errors.Wrap(err, 1))
+    }
+}
+
+func Panic(err interface{}) {
+    _, ok := err.(*errors.Error)
+    if ok == true {
+        panic(err)
+    } else {
+        panic(errors.Wrap(err, 1))
+    }
+}
+
+func Wrap(err interface{}) *errors.Error {
+    es, ok := err.(*errors.Error)
+    if ok == true {
+        return es
+    } else {
+        return errors.Wrap(err, 1)
+    }
+}
+
+func PanicIf(err interface{}) {
+    if err == nil {
+        return
+    }
+
+    _, ok := err.(*errors.Error)
+    if ok == true {
+        panic(err)
+    } else {
+        panic(errors.Wrap(err, 1))
+    }
 }
 
 func init() {
