@@ -153,18 +153,18 @@ func (aeam AppEngineAdapterMaker) New() LogAdapter {
 
 func AddAdapterMaker(name string, am AdapterMaker) {
     if _, found := makers[name]; found == true {
-        panic(ErrAdapterMakerAlreadyDefined)
+        Panic(ErrAdapterMakerAlreadyDefined)
     }
 
     makers[name] = am
 }
 
 type LogAdapter interface {
-    Criticalf(lc *LogContext, message *string) error
     Debugf(lc *LogContext, message *string) error
-    Errorf(lc *LogContext, message *string) error
     Infof(lc *LogContext, message *string) error
     Warningf(lc *LogContext, message *string) error
+    Errorf(lc *LogContext, message *string) error
+    Criticalf(lc *LogContext, message *string) error
 }
 
 // TODO(dustin): !! Also populate whether we've bypassed an exception so that 
@@ -200,7 +200,7 @@ func NewLoggerWithAdapter(noun string, la *LogAdapter) *Logger {
     var systemLevel int
     var found bool
     if systemLevel, found = LevelNameMap[levelName]; found == false {
-        panic(ErrLogLevelInvalid)
+        Panic(ErrLogLevelInvalid)
     }
 
     l.systemLevel = systemLevel
@@ -209,7 +209,7 @@ func NewLoggerWithAdapter(noun string, la *LogAdapter) *Logger {
 
     format := format
     if format == "" {
-        panic(ErrFormatEmpty)
+        Panic(ErrFormatEmpty)
     }
 
     l.SetFormat(format)
@@ -228,7 +228,7 @@ func NewLogger(noun string) *Logger {
 
 func (l *Logger) SetFormat(format string) {
     if t, err := template.New("logItem").Parse(format); err != nil {
-        panic(err)
+        Panic(err)
     } else {
         l.t = t
     }
