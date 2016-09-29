@@ -180,7 +180,7 @@ The following logging methods are available:
 - `Criticalf`
 - `Panicf`
 
-Notice that this list and the signatures of the methods of the interface diverge slightly from what is required of the adapter interface. Specifically, the "error" and "critical" methods take an error and `Panicf()` will simply log via `Criticalf()` and panic. 
+Notice that both this list and the signatures of the methods diverge slightly from what is required of the adapter interface. Specifically, the "error" and "critical" methods take an error and `Panicf()` will simply log via `Criticalf()` and panic. 
 
 You may also call `SetFormat` on the logger instance to set a specific format rather than taking the global default.
 
@@ -190,7 +190,7 @@ Additionally we provide several "if" methods that will return without doing anyt
 - `CriticalIff`
 - `PanicIff`
 
-*Though technically this naming means one thing (e.g. `PanicIff` stands for "panic, if, format") internally we consider it as meaning "panic if-and-only-if the error is not nil" (the mathematical interpretation of the naming).*
+*Though technically this naming means one thing (e.g. `PanicIff` stands for "panic, if, format"), internally we consider it as meaning "panic if-and-only-if the error is not nil" (the mathematical interpretation of the naming).*
 
 
 ## Convenience Functions
@@ -202,7 +202,7 @@ Additionally we provide several "if" methods that will return without doing anyt
 
 ## Footnote
 
-It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable, such as "(LibraryNameHere)DoShowLogging", that has been defined and set to TRUE.
+It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable (e.g. "(LibraryNameHere)DoShowLogging") defined that indicates otherwise.
 
 
 ## Configuration
