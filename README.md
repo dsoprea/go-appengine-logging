@@ -9,21 +9,40 @@ The simplest, possible example:
 package thispackage
 
 import (
+    e "errors"
+
     "golang.org/x/net/context"
 
     "github.com/dsoprea/go-appengine-logging"
 )
 
 var (
-    thisfile_log = log.NewLogger("thisfile")
+    thisfileLog = log.NewLogger("thisfile")
 )
 
 func a_cry_for_help(ctx context.Context) {
-    thisfile_log.Errorf(ctx, "How big is my problem: %s", "pretty big")
+    thisfileLog.Debugf(ctx, "I thought I'd be a hero.")
+
+    err := e.New("you're going to regret this tomorrow")
+    thisfileLog.Errorf(ctx, err, "How big is my problem: %s", "pretty big")
+}
+
+func function_that_fails() error {
+    return e.New("some error")
+}
+
+func minding_my_own_business(ctx context.Context) {
+    if err := function_that_fails(); err != nil {
+        log.Panic(err)
+    }
+
+    thisfileLog.Debugf(ctx, "No problem, here.")
 }
 ```
 
 Notice that we pass in the name of a prefix (what we refer to as a "noun") to `log.NewLogger()`. This is a simple, descriptive name that represents the current body of logic. We recommend that you define a different log for every file at the package level, but it is your choice if you want to go with this methodology, share the same logger over the entire package, define one for each struct, etc..
+
+Notice, also, that we use the `log.Panic()` call to propagate an error we received. This will equip the error with a stacktrace at the current frame.
 
 ### Example Output
 
@@ -45,11 +64,11 @@ This project provides one built-in logging adapter: "appengine", which invokes t
 
 ```go
 type LogAdapter interface {
-    Criticalf(lc *LogContext, message *string) error
     Debugf(lc *LogContext, message *string) error
-    Errorf(lc *LogContext, message *string) error
     Infof(lc *LogContext, message *string) error
     Warningf(lc *LogContext, message *string) error
+    Errorf(lc *LogContext, message *string) error
+    Criticalf(lc *LogContext, message *string) error
 }
 ```
 
@@ -71,15 +90,7 @@ type DummyLogAdapter struct {
 
 }
 
-func (dla DummyLogAdapter) Criticalf(lc *LogContext, message *string) error {
-    
-}
-
 func (dla DummyLogAdapter) Debugf(lc *LogContext, message *string) error {
-    
-}
-
-func (dla DummyLogAdapter) Errorf(lc *LogContext, message *string) error {
     
 }
 
@@ -88,6 +99,14 @@ func (dla DummyLogAdapter) Infof(lc *LogContext, message *string) error {
 }
 
 func (dla DummyLogAdapter) Warningf(lc *LogContext, message *string) error {
+    
+}
+
+func (dla DummyLogAdapter) Errorf(lc *LogContext, message *string) error {
+    
+}
+
+func (dla DummyLogAdapter) Criticalf(lc *LogContext, message *string) error {
     
 }
 ```
@@ -129,7 +148,7 @@ func init() {
 We discuss how to then reference the adapter-maker from configuration in the "Configuration" section below.
 
 
-### Filters
+## Filters
 
 We support the ability to exclusively log for a specific set of nouns (we'll exclude any not specified):
 
@@ -147,13 +166,46 @@ log.AddExcludeFilter("nountohide2")
 
 We'll first hit the include-filters. If it's in there, we'll forward the log item to the adapter. If not, and there is at least one include filter in the list, we won't do anything. If the list of include filters is empty but the noun appears in the exclude list, we won't do anything.
 
+We also provide filter-removal functions: `log.RemoveIncludeFilter()`, `log.RemoveExcludeFilter()`
 
-#### Footnote
+
+## Logging Methods
+
+The following logging methods are available:
+
+- `Debugf`
+- `Infof`
+- `Warningf`
+- `Errorf`
+- `Criticalf`
+- `Panicf`
+
+Notice that this list and the signatures of the methods of the interface diverge slightly from what is required of the adapter interface. Specifically, the "error" and "critical" methods take an error and `Panicf()` will simply log via `Criticalf()` and panic. 
+
+You may also call `SetFormat` on the logger instance to set a specific format rather than taking the global default.
+
+Additionally we provide several "if" methods that will return without doing anything if a `nil` error is provided:
+
+- `ErrorIff`
+- `CriticalIff`
+- `PanicIff`
+
+*Though technically this naming means one thing (e.g. `PanicIff` stands for "panic, if, format") internally we consider it as meaning "panic if-and-only-if the error is not nil" (the mathematical interpretation of the naming).*
+
+
+## Convenience Functions
+
+- `log.Wrap`: Equip the given error with a stacktrace if it does not already have one.
+- `log.Panic`: Equip the given error with a stacktrace, if it does not already have one, and panic.
+- `log.PanicIf`: Same as `log.Panic()` but don't do anything if given `nil`.
+
+
+## Footnote
 
 It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable, such as "(LibraryNameHere)DoShowLogging", that has been defined and set to TRUE.
 
 
-### Configuration
+## Configuration
 
 The following configuration keys can be used to pre-configure your logging directly from your configuration (the AppEngine YAML files):
 
