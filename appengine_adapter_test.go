@@ -2,6 +2,7 @@ package aelog
 
 import (
     "testing"
+    e "errors"
 
     "github.com/dsoprea/go-logging"
 
@@ -29,4 +30,9 @@ func TestAppengine(t *testing.T) {
 
     l := log.NewLoggerWithAdapter("appengine_test", "appengine")
     l.Debugf(ctx, "Test message.")
+    l.Infof(ctx, "Test message.")
+    l.Warningf(ctx, "Test message.")
+    
+    err := e.New("some error")
+    l.Errorf(ctx, err, "Test message.")
 }
