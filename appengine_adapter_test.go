@@ -2,11 +2,8 @@ package aelog
 
 import (
     "testing"
-    e "errors"
 
     "github.com/dsoprea/go-logging"
-
-    "golang.org/x/net/context"
 )
 
 func TestAppengine(t *testing.T) {
