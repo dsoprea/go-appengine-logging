@@ -29,4 +29,7 @@ func TestAppengine(t *testing.T) {
 
     l := log.NewLoggerWithAdapter("appengine_test", "appengine")
     l.Debugf(ctx, "Test message.")
+    l.Infof(ctx, "Test message.")
+    l.Warningf(ctx, "Test message.")
+    l.Errorf(ctx, "Test message.")
 }
