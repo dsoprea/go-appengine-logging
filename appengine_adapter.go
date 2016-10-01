@@ -1,41 +1,48 @@
-package log
+package aelog
 
 import (
-    "google.golang.org/appengine/log"
+    a "google.golang.org/appengine/log"
+
+    "github.com/dsoprea/go-logging"
 )
 
-type AppEngineLogAdapter struct {
+type AppengineLogAdapter struct {
 
 }
 
-// TODO(dustin): !! Fix these to use pointer receivers.
-
-func (ael AppEngineLogAdapter) Criticalf(lc *LogContext, message *string) error {
-    log.Criticalf(lc.Ctx, *message)
+func (ala *AppengineLogAdapter) Debugf(lc *log.LogContext, message *string) error {
+    a.Debugf(lc.Ctx, *message)
 
     return nil
 }
 
-func (ael AppEngineLogAdapter) Debugf(lc *LogContext, message *string) error {
-    log.Debugf(lc.Ctx, *message)
+func (ala *AppengineLogAdapter) Infof(lc *log.LogContext, message *string) error {
+    a.Infof(lc.Ctx, *message)
 
     return nil
 }
 
-func (ael AppEngineLogAdapter) Errorf(lc *LogContext, message *string) error {
-    log.Errorf(lc.Ctx, *message)
+func (ala *AppengineLogAdapter) Warningf(lc *log.LogContext, message *string) error {
+    a.Warningf(lc.Ctx, *message)
 
     return nil
 }
 
-func (ael AppEngineLogAdapter) Infof(lc *LogContext, message *string) error {
-    log.Infof(lc.Ctx, *message)
+func (ala *AppengineLogAdapter) Errorf(lc *log.LogContext, message *string) error {
+    a.Errorf(lc.Ctx, *message)
 
     return nil
 }
 
-func (ael AppEngineLogAdapter) Warningf(lc *LogContext, message *string) error {
-    log.Warningf(lc.Ctx, *message)
 
-    return nil
+type AppengineAdapterMaker struct {
+
+}
+
+func NewAppengineAdapterMaker() *AppengineAdapterMaker {
+    return new(AppengineAdapterMaker)
+}
+
+func (aam AppengineAdapterMaker) New() log.LogAdapter {
+    return new(AppengineLogAdapter)
 }

@@ -1,217 +1,62 @@
-Go's logging is pretty basic by design. Go under AppEngine is even more stripped down. For example, there is no logging struct (`Logger` under traditional Go) and there is no support for prefixes. This package not only equips an AppEngine application with both, but adds include/exclude filters, pluggable logging adapters, and configuration-driven design. This allows you to be able to turn on and off logging for certain packages/files or dependencies as well as to be able to do it from configuration (the YAML files, using `os.Getenv()`).
+[![Build Status](https://travis-ci.org/dsoprea/go-appengine-logging.svg?branch=master)](https://travis-ci.org/dsoprea/go-appengine-logging)
 
+## Overview
 
-## Getting Started
+This project uses the [go-logging](https://github.com/dsoprea/go-logging) project to provide enhanced logging under AppEngine. This includes the availability of stacktraces.
 
-The simplest, possible example:
+## Example
+
+Usage:
 
 ```go
-package thispackage
+package app
 
 import (
     e "errors"
 
     "golang.org/x/net/context"
 
+    "github.com/dsoprea/go-logging"
     "github.com/dsoprea/go-appengine-logging"
 )
 
 var (
-    thisfileLog = log.NewLogger("thisfile")
+    // You should create one of these at the top of every file and name them so 
+    // it's clear which file they represent.
+    thisfileLogger = log.NewLogger("app.thisfile")
 )
 
-func a_cry_for_help(ctx context.Context) {
-    thisfileLog.Debugf(ctx, "I thought I'd be a hero.")
-
-    err := e.New("you're going to regret this tomorrow")
-    thisfileLog.Errorf(ctx, err, "How big is my problem: %s", "pretty big")
-}
-
-func function_that_fails() error {
-    return e.New("some error")
-}
-
-func minding_my_own_business(ctx context.Context) {
-    if err := function_that_fails(); err != nil {
-        log.Panic(err)
-    }
-
-    thisfileLog.Debugf(ctx, "No problem, here.")
-}
-```
-
-Notice that we pass in the name of a prefix (what we refer to as a "noun") to `log.NewLogger()`. This is a simple, descriptive name that represents the current body of logic. We recommend that you define a different log for every file at the package level, but it is your choice if you want to go with this methodology, share the same logger over the entire package, define one for each struct, etc..
-
-Notice, also, that we use the `log.Panic()` call to propagate an error we received. This will equip the error with a stacktrace at the current frame.
-
-### Example Output
-
-Example output from a real application (not from the above):
-
-```
-2016/09/09 12:57:44 DEBUG: user: User revisiting: [test@example.com]
-2016/09/09 12:57:44 DEBUG: context: Session already inited: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
-2016/09/09 12:57:44 DEBUG: session_data: Session save not necessary: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
-2016/09/09 12:57:44 DEBUG: context: Got session: [DCRBDGRY6RMWANCSJXVLD7GULDH4NZEB6SBAQ3KSFIGA2LP45IIQ]
-2016/09/09 12:57:44 DEBUG: session_data: Found user in session.
-2016/09/09 12:57:44 DEBUG: cache: Cache miss: [geo.geocode.reverse:dhxp15x]
-```
-
-
-## Adapters
-
-This project provides one built-in logging adapter: "appengine", which invokes the default AppEngine logger. If you would like to implement your own logger, just create a struct type that satisfies the LogAdapter interface.
-
-```go
-type LogAdapter interface {
-    Debugf(lc *LogContext, message *string) error
-    Infof(lc *LogContext, message *string) error
-    Warningf(lc *LogContext, message *string) error
-    Errorf(lc *LogContext, message *string) error
-    Criticalf(lc *LogContext, message *string) error
-}
-```
-
-The *LogContext* struct passed in provides additional information that you may need in order to do what you need to do:
-
-```go
-type LogContext struct {
-    Logger *Logger
-    Ctx context.Context
-}
-```
-
-Note that *Logger* represents your Logger instance. It exports `Noun *string` in the event you want to discriminate where your log entries go.
-
-Adapter example:
-
-```go
-type DummyLogAdapter struct {
-
-}
-
-func (dla DummyLogAdapter) Debugf(lc *LogContext, message *string) error {
+func someCall(ctx context.Context) {
+    thisfileLogger.Debugf(ctx, "Test message.")
+    thisfileLogger.Infof(ctx, "Test message.")
+    thisfileLogger.Warningf(ctx, "Test message.")
     
+    err := e.New("some error")
+    thisfileLogger.Errorf(ctx, err, "Test message.")
 }
 
-func (dla DummyLogAdapter) Infof(lc *LogContext, message *string) error {
-    
-}
-
-func (dla DummyLogAdapter) Warningf(lc *LogContext, message *string) error {
-    
-}
-
-func (dla DummyLogAdapter) Errorf(lc *LogContext, message *string) error {
-    
-}
-
-func (dla DummyLogAdapter) Criticalf(lc *LogContext, message *string) error {
-    
-}
-```
-
-There are a couple of ways to tell Logger to use a specific adapter:
-
-1. Instead of calling `log.NewLogger(noun string)`, call `log.NewLoggerWithAdapter(noun string, la *LogAdapter)` and provide a struct of your adapter type.
-2. Register a factory type for your adapter and set the name of the adapter into your YAML configuration (under `env_variables`).
-
-
-The factory must satisfy the *AdapterMaker* interface:
-
-```go
-type AdapterMaker interface {
-    New() LogAdapter
-}
-```
-
-An example factory and registration of the factory:
-
-```go
-type DummyLogAdapterMaker struct {
-    
-}
-
-func (dlam DummyLogAdapterMaker) New() log.LogAdapter {
-    return DummyLogAdapter{}
-}
-```
-
-We then recommending registering it from the `init()` function of the fiel that defines the maker type:
-
-```go
+// Do this in whichever file initializes your application. Don't do this in 
+// libraries.
 func init() {
-    log.AddAdapterMaker("dummy", DummyLogAdapterMaker{})
+    aam := aelog.NewAppengineAdapterMaker()
+    log.AddAdapterMaker("appengine", aam)
 }
 ```
 
-We discuss how to then reference the adapter-maker from configuration in the "Configuration" section below.
+Example application output:
 
-
-## Filters
-
-We support the ability to exclusively log for a specific set of nouns (we'll exclude any not specified):
-
-```go
-log.AddIncludeFilter("nountoshow1")
-log.AddIncludeFilter("nountoshow2")
+```
+2016/10/01 18:42:25 DEBUG: common.geographic: Geocode result (0) address component (5): [US] [United States] [[country political]]
+2016/10/01 18:42:25 DEBUG: common.geographic: Geocode result (0) address component (6): [33436] [33436] [[postal_code]]
+2016/10/01 18:42:25 DEBUG: common.geographic: Geocode result (0) address component (7): [8616] [8616] [[postal_code_suffix]]
+2016/10/01 18:42:25 DEBUG: app: Flushing session: [SessionData<JW6NOY236NSOJJRXZDG73MRGSJHLHR34JCEHGONMM46N66LIDBOQ>]
+INFO     2016-10-01 18:42:25,287 module.py:788] default: "GET /api/1/geo/place/geocode/reverse?lat=26.562653899999997&lon=-80.1022059 HTTP/1.1" 200 103
+2016/10/01 18:42:25 DEBUG: data.user: Retrieving user-account: [test@example.com]
+2016/10/01 18:42:25 DEBUG: data.user: Found and returning.
+2016/10/01 18:42:25 DEBUG: user: User login: [test@example.com]
+2016/10/01 18:42:27 DEBUG: common.geographic: Caching place: [ChIJb5J6W0Mn2YgR5MuqicTF5PA] [D.M.T. Preservations LLC] [geo.places.nearby.entity:ChIJb5J6W0Mn2YgR5MuqicTF5PA]
+2016/10/01 18:42:27 DEBUG: common.geographic: Caching place: [ChIJq87Z0GAn2YgR9u32K0j_ur4] [Napoli Ristorante Pizzeria] [geo.places.nearby.entity:ChIJq87Z0GAn2YgR9u32K0j_ur4]
+2016/10/01 18:42:27 DEBUG: common.geographic: Caching place: [ChIJu_N2xWAn2YgR62tDpH3zjqo] [Sabai Thai Restaurant] [geo.places.nearby.entity:ChIJu_N2xWAn2YgR62tDpH3zjqo]
 ```
 
-Depending on your needs, you might just want to exclude a couple and include the rest:
-
-```go
-log.AddExcludeFilter("nountohide1")
-log.AddExcludeFilter("nountohide2")
-```
-
-We'll first hit the include-filters. If it's in there, we'll forward the log item to the adapter. If not, and there is at least one include filter in the list, we won't do anything. If the list of include filters is empty but the noun appears in the exclude list, we won't do anything.
-
-We also provide filter-removal functions: `log.RemoveIncludeFilter()`, `log.RemoveExcludeFilter()`
-
-
-## Logging Methods
-
-The following logging methods are available:
-
-- `Debugf`
-- `Infof`
-- `Warningf`
-- `Errorf`
-- `Criticalf`
-- `Panicf`
-
-Notice that both this list and the signatures of the methods diverge slightly from what is required of the adapter interface. Specifically, the "error" and "critical" methods take an error and `Panicf()` will simply log via `Criticalf()` and panic. 
-
-You may also call `SetFormat` on the logger instance to set a specific format rather than taking the global default.
-
-Additionally we provide several "if" methods that will return without doing anything if a `nil` error is provided:
-
-- `ErrorIff`
-- `CriticalIff`
-- `PanicIff`
-
-*Though technically this naming means one thing (e.g. `PanicIff` stands for "panic, if, format"), internally we consider it as meaning "panic if-and-only-if the error is not nil" (the mathematical interpretation of the naming).*
-
-
-## Convenience Functions
-
-- `log.Wrap`: Equip the given error with a stacktrace if it does not already have one.
-- `log.Panic`: Equip the given error with a stacktrace, if it does not already have one, and panic.
-- `log.PanicIf`: Same as `log.Panic()` but don't do anything if given `nil`.
-
-
-## Footnote
-
-It is a good convention to exclude the nouns of any library you are writing whose logging you do not want to generally be aware of unless you are debugging. You might call `AddExcludeFilter()` from the `init()` function at the bottom of those files unless there is some configuration variable (e.g. "(LibraryNameHere)DoShowLogging") defined that indicates otherwise.
-
-
-## Configuration
-
-The following configuration keys can be used to pre-configure your logging directly from your configuration (the AppEngine YAML files):
-
-- *LogFormat*: The default format used to build the message that gets sent to the adapter. It is assumed that the adapter already prefixes the message with time and log-level (since the default AppEngine logger does). The default value is: `{{.Noun}}:{{if eq .ExcludeBypass true}} [BYPASS]{{end}} {{.Message}}`. The available tokens are "Noun", "ExcludeBypass", and "Message".
-- *LogAdapterName*: The name of the adapter to use when NewLogger() is called.
-- *LogLevelName*: The priority-level of messages permitted to be logged (all others will be discarded). By default, it is "info". Other levels are: "debug", "warning", "error", "critical"
-- *LogIncludeNouns*: Comma-separated list of nouns to log for. All others will be ignored.
-- *LogExcludeNouns*: Comma-separated list on nouns to exclude from logging.
-- *LogExcludeBypassLevelName*: The log-level at which we will show logging for nouns that have been excluded. Allows you to hide excessive, unimportant logging for nouns but to still see their warnings, errors, etc...
+For more information, see the documentation for [go-logging](https://github.com/dsoprea/go-logging).
