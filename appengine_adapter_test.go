@@ -13,7 +13,7 @@ func TestAppengine(t *testing.T) {
     log.ClearAdapters()
 
     ala := NewAppengineLogAdapter()
-    log.AddAdapterMaker("appengine", ala)
+    log.AddAdapter("appengine", ala)
 
     an := log.GetDefaultAdapterName()
     if an != "appengine" {
