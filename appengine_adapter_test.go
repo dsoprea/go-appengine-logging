@@ -12,12 +12,12 @@ func TestAppengine(t *testing.T) {
 
     log.ClearAdapters()
 
-    aam := NewAppengineAdapterMaker()
-    log.AddAdapterMaker("appengine", aam)
+    ala := NewAppengineLogAdapter()
+    log.AddAdapterMaker("appengine", ala)
 
     an := log.GetDefaultAdapterName()
     if an != "appengine" {
-        t.Error("Adapter was not properly registered.")
+        t.Error("AppEngine adapter was not properly registered.")
     }
 
     // We can't actually test the logging calls unless we establish a full GAE 

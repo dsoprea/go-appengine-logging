@@ -10,6 +10,10 @@ type AppengineLogAdapter struct {
 
 }
 
+func NewAppengineLogAdapter() log.LogAdapter {
+    return new(AppengineLogAdapter)
+}
+
 func (ala *AppengineLogAdapter) Debugf(lc *log.LogContext, message *string) error {
     a.Debugf(lc.Ctx, *message)
 
@@ -32,17 +36,4 @@ func (ala *AppengineLogAdapter) Errorf(lc *log.LogContext, message *string) erro
     a.Errorf(lc.Ctx, *message)
 
     return nil
-}
-
-
-type AppengineAdapterMaker struct {
-
-}
-
-func NewAppengineAdapterMaker() *AppengineAdapterMaker {
-    return new(AppengineAdapterMaker)
-}
-
-func (aam AppengineAdapterMaker) New() log.LogAdapter {
-    return new(AppengineLogAdapter)
 }
